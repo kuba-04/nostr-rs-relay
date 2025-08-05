@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - registry
 
 jobs:
   test_nostr-rs-relay:
@@ -37,3 +38,19 @@ jobs:
       - name: Build
         run: |
           cargo build --release --locked
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' || github.ref == 'refs/heads/registry'
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+
+      - name: Build Docker image for registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' || github.ref == 'refs/heads/registry'
+        run: |
+          docker build -t ghcr.io/${{ secrets.GHCR_USERNAME }}/nostr-rs-relay:${{ github.sha }} .
+          docker tag ghcr.io/${{ secrets.GHCR_USERNAME }}/nostr-rs-relay:${{ github.sha }} ghcr.io/${{ secrets.GHCR_USERNAME }}/nostr-rs-relay:latest
+
+      - name: Push Docker image to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' || github.ref == 'refs/heads/registry'
+        run: |
+          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/nostr-rs-relay:${{ github.sha }}
+          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/nostr-rs-relay:latest
